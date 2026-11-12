@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel do Portfólio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Manrope:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/* Painel de bancada: fundo escuro quente, o produto em destaque na vitrine clara (igual ao portfólio), dados à direita. */
+:root{
+  --bg:#131210; --panel:#1b1916; --panel-2:#23201c; --raise:#2b2823; --line:#36322b; --line-2:#4a443b;
+  --ink:#f3eee6; --ink-2:#c3bbae; --ink-3:#8f877a;
+  --gold:#c9a24e; --gold-ink:#1d1708;
+  --artd:#7d95ff; --dest:#e5687a; --cand:#ff6aa9;
+  --ok:#5fc48a; --warn:#e6b450; --bad:#ef6a5b;
+  --stage:#f7f4ee; --paper:#fffdf9;
+  --serif:"Fraunces", Georgia, "Times New Roman", serif;
+  --sans:"Manrope", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- topo ---------- */
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 20px;padding-top:calc(12px + env(safe-area-inset-top,0px));background:rgba(19,18,16,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand b{font-family:var(--serif);font-weight:800;font-size:19px;letter-spacing:-.01em;white-space:nowrap}
+.brand span{font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);white-space:nowrap}
+.top .sp{flex:1}
+.who{font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.btn{height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line-2);background:var(--panel-2);font-weight:700;font-size:12.5px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;transition:background .15s,border-color .15s}
+.btn:hover{border-color:var(--ink-3);background:var(--raise)}
+.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+.btn.primary:hover{background:#d8b260}
+.btn.danger{border-color:#6b2b24;color:#ffb3a9;background:#2a1714}
+.btn.danger.armed{background:var(--bad);border-color:var(--bad);color:#1a0705}
+.btn:disabled{opacity:.5;cursor:default}
+a.btn{text-decoration:none;color:inherit}
+
+/* ---------- telas de entrada ---------- */
+.gate{min-height:calc(100vh - 64px);display:grid;place-items:center;padding:24px 16px}
+.gcard{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:30px 26px;display:grid;gap:16px}
+.gcard h1{font-family:var(--serif);font-size:28px;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+.gcard p{color:var(--ink-2);line-height:1.55}
+.msg{font-size:13px;line-height:1.5;padding:10px 12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--line)}
+.msg.bad{border-color:#6b2b24;color:#ffc2b9;background:#2a1714}
+.msg.ok{border-color:#2c5a3f;color:#bfeccf;background:#13241a}
+
+/* ---------- campos ---------- */
+.f{display:grid;gap:6px;min-width:0}
+.f>span{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.f input,.f select{height:42px;width:100%;border-radius:12px;border:1px solid var(--line-2);background:var(--panel-2);padding:0 12px;outline:none;transition:border-color .15s}
+.f input:focus,.f select:focus{border-color:var(--gold)}
+.f input[readonly]{color:var(--ink-3);background:var(--panel)}
+.f small{font-size:11.5px;color:var(--ink-3);line-height:1.4}
+.f.changed input,.f.changed select{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
+
+/* ---------- área de trabalho ---------- */
+.app{display:grid;grid-template-columns:minmax(300px,380px) 1fr;height:calc(100vh - 63px)}
+.list{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+.lhead{padding:14px 14px 10px;display:grid;gap:10px;border-bottom:1px solid var(--line)}
+.search{position:relative}
+.search input{height:40px;width:100%;border-radius:999px;border:1px solid var(--line-2);background:var(--panel-2);padding:0 14px 0 38px;outline:none}
+.search input:focus{border-color:var(--gold)}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{height:30px;padding:0 11px;border-radius:999px;border:1px solid var(--line-2);background:transparent;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:6px;color:var(--ink-2)}
+.chip i{width:7px;height:7px;border-radius:50%}
+.chip em{font-style:normal;color:var(--ink-3);font-weight:600}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.on em{color:#5d574e}
+.lrow{display:flex;gap:8px}
+.lrow .btn{flex:1;justify-content:center}
+.rows{overflow:auto;flex:1;padding:6px 8px 18px}
+.gh{font-size:10.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);padding:14px 8px 6px;display:flex;align-items:center;gap:8px}
+.gh i{width:7px;height:7px;border-radius:50%}
+.row{width:100%;display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;text-align:left;padding:7px 8px;border-radius:12px;border:1px solid transparent;background:transparent}
+.row:hover{background:var(--panel-2)}
+.row.sel{background:var(--raise);border-color:var(--line-2)}
+.row .th{width:44px;height:44px;border-radius:10px;background:var(--stage);display:grid;place-items:center;overflow:hidden}
+.row .th img{max-width:86%;max-height:86%;object-fit:contain;mix-blend-mode:multiply}
+.row .t{min-width:0}
+.row .t b{display:block;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .t span{display:block;font-size:11.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .c{font-size:11px;color:var(--ink-3);font-weight:700}
+.pill{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:999px;display:inline-block;margin-left:6px;vertical-align:1px}
+.pill.off{background:#3a2a17;color:var(--warn)}
+.pill.nofoto{background:#3a1d1a;color:#ff9d90}
+.pill.dirty{background:#3b3214;color:var(--gold)}
+
+/* banner de base vazia */
+.seed{margin:12px;padding:14px;border-radius:16px;background:#221c10;border:1px solid #5a4824;display:grid;gap:10px}
+.seed b{font-size:13.5px}
+.seed p{font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s}
+
+/* ---------- editor ---------- */
+.ed{overflow:auto;min-height:0;position:relative}
+.empty{height:100%;display:grid;place-items:center;text-align:center;padding:24px;color:var(--ink-3)}
+.empty h2{font-family:var(--serif);font-size:26px;color:var(--ink-2);margin-bottom:6px}
+.edin{max-width:1060px;margin:0 auto;padding:22px 24px 120px;display:grid;grid-template-columns:minmax(260px,340px) 1fr;gap:28px;align-items:start}
+.back{display:none}
+.ehead{grid-column:1/-1;display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.ehead .k{font-size:10.5px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.ehead h2{font-family:var(--serif);font-size:clamp(22px,2.6vw,32px);font-weight:800;letter-spacing:-.02em;line-height:1.1;text-wrap:balance}
+.ehead .meta{margin-left:auto;font-size:11.5px;color:var(--ink-3)}
+
+/* vitrine: mesma proporção e regra de posição do portfólio */
+.prev{position:sticky;top:16px;display:grid;gap:12px}
+.pcard{background:var(--paper);border-radius:22px;overflow:hidden;color:#16130f}
+.stage{position:relative;aspect-ratio:1/1.02;background:radial-gradient(85% 70% at 50% 42%,#fff 0,var(--stage) 62%,#efe9df 120%)}
+.stage:before{content:"";position:absolute;left:var(--sl,24%);width:var(--sw,52%);bottom:calc(var(--fl,8%) - 7px);height:14px;border-radius:50%;background:radial-gradient(closest-side,rgba(22,19,15,.24),transparent)}
+.stage img{position:absolute;object-fit:fill;mix-blend-mode:multiply}
+.stage .nof{position:absolute;inset:0;display:grid;place-items:center;color:#9a9184;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.drop{position:absolute;inset:10px;border:2px dashed transparent;border-radius:16px;transition:border-color .15s,background .15s}
+.stage.over .drop{border-color:var(--gold);background:rgba(201,162,78,.08)}
+.pbody{padding:12px 16px 16px;display:grid;gap:8px}
+.pbody .cd{font-size:10.5px;font-weight:800;letter-spacing:.12em;color:#8a8276}
+.pbody .nm{font-weight:800;font-size:14px;line-height:1.25}
+.pcx{border-radius:14px;padding:10px 14px;color:#fff;background:#14286f}
+.pcx[data-sec=DESTILADOS]{background:#4b0d16}
+.pcx[data-sec=CANDIES]{background:#8e0f4a}
+.pcx .lb{font-size:9.5px;font-weight:800;letter-spacing:.16em;opacity:.8}
+.pcx .v{font-family:var(--serif);font-weight:800;display:flex;align-items:baseline;gap:8px;margin-top:3px}
+.pcx .v .q{font-size:20px;opacity:.92}.pcx .v .is{font-size:16px;opacity:.6}.pcx .v .l{font-size:30px}
+.pcx small{font-family:var(--sans);font-size:10.5px;font-weight:800;letter-spacing:.1em;margin-left:3px;opacity:.85}
+.pcx em{font-style:normal;font-size:.58em}
+.photo-info{font-size:12px;color:var(--ink-3);line-height:1.5}
+.photo-info .w{color:var(--warn)} .photo-info .g{color:var(--ok)}
+
+.form{display:grid;gap:22px;min-width:0}
+fieldset{border:0;display:grid;gap:12px;min-width:0}
+legend{font-family:var(--serif);font-size:17px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.calc{font-size:12.5px;color:var(--ink-2);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.calc b{color:var(--gold)}
+.tog{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.tog input{width:20px;height:20px;accent-color:var(--gold)}
+.tog span{font-size:13px;color:var(--ink-2)}
+
+.actions{position:sticky;bottom:0;z-index:5;grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to bottom,rgba(19,18,16,0),var(--bg) 35%)}
+.actions .sp{flex:1}
+
+/* aviso */
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px;padding:12px 18px;border-radius:999px;transition:all .25s;z-index:50;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--bad);color:#1a0705}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;height:auto}
+  .list{border-right:0;min-height:calc(100vh - 63px)}
+  .ed{position:fixed;inset:0;z-index:30;background:var(--bg);transform:translateX(100%);transition:transform .25s}
+  .ed.open{transform:none}
+  .edin{grid-template-columns:1fr;padding:16px 16px 120px;gap:20px}
+  .back{display:inline-flex;grid-column:1/-1;justify-self:start}
+  .prev{position:static;grid-template-columns:150px 1fr;align-items:start}
+  .pbody{display:none}
+  .who{display:none}
+  .hide-m{display:none}
+  .actions{flex-wrap:nowrap;gap:8px}
+  .actions .btn{padding:0 14px}
+}
+@media (max-width:420px){ .g3{grid-template-columns:repeat(2,minmax(0,1fr))} .brand span{display:none} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><b>Portfólio Novos Negócios</b><span>Painel de ajustes</span></div>
+  <div class="sp"></div>
+  <span class="who" id="who"></span>
+  <a class="btn hide-m" href="./index.html" target="_blank" rel="noopener">Ver portfólio ↗</a>
+  <button class="btn" id="sair" hidden>Sair</button>
+</header>
+
+<!-- configuração (só aparece se a URL/chave não estiverem no arquivo) -->
+<main class="gate" id="vSetup" hidden>
+  <form class="gcard" id="fSetup">
+    <h1>Conectar ao banco</h1>
+    <p>Cole a URL do projeto e a chave <b>anon public</b> do Supabase (Project Settings → API). Ficam salvas só neste navegador.</p>
+    <label class="f"><span>URL do projeto</span><input id="sUrl" placeholder="https://xxxx.supabase.co" autocomplete="off"></label>
+    <label class="f"><span>Chave anon public</span><input id="sKey" placeholder="eyJhbGciOi…" autocomplete="off"></label>
+    <button class="btn primary" type="submit">Conectar</button>
+  </form>
+</main>
+
+<!-- login -->
+<main class="gate" id="vLogin" hidden>
+  <form class="gcard" id="fLogin">
+    <h1>Entrar no painel</h1>
+    <p>Entre com o seu usuário e senha. Só o usuário liberado como administrador do portfólio consegue salvar.</p>
+    <label class="f"><span>Usuário</span><input id="lEmail" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+    <label class="f"><span>Senha</span><input id="lPass" type="password" autocomplete="current-password" required></label>
+    <div class="msg bad" id="lErr" hidden></div>
+    <button class="btn primary" type="submit" id="lBtn">Entrar</button>
+  </form>
+</main>
+
+<!-- sem permissão -->
+<main class="gate" id="vDenied" hidden>
+  <div class="gcard">
+    <h1>Login sem permissão de edição</h1>
+    <p>Você entrou, mas este usuário não está liberado como administrador do portfólio. No Supabase, rode a parte 5 do arquivo <b>portfolio_supabase.sql</b> com o nome deste usuário e entre de novo.</p>
+    <div class="msg" id="dWho"></div>
+  </div>
+</main>
+
+<!-- painel -->
+<div class="app" id="vApp" hidden>
+  <aside class="list">
+    <div class="seed" id="seed" hidden>
+      <b>Banco do portfólio vazio</b>
+      <p>Importe os produtos e as fotos do portfólio publicado. É feito uma vez só; depois tudo é ajustado por aqui.</p>
+      <div class="bar"><i id="seedBar"></i></div>
+      <div class="msg" id="seedMsg" hidden></div>
+      <input type="file" id="seedFile" accept=".html,text/html" hidden>
+      <button class="btn primary" id="seedBtn">Importar produtos do portfólio</button>
+    </div>
+    <div class="lhead">
+      <label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Buscar por nome, código ou parceiro" autocomplete="off"></label>
+      <div class="chips" id="chips"></div>
+      <div class="lrow"><button class="btn primary" id="novo">+ Novo produto</button><button class="btn" id="recarregar" title="Recarregar do banco">↻ Atualizar</button></div>
+    </div>
+    <div class="rows" id="rows"></div>
+  </aside>
+
+  <section class="ed" id="ed">
+    <div class="empty" id="edEmpty"><div><h2>Escolha um produto</h2><p>Clique em um item da lista para ajustar dados ou trocar a foto.</p></div></div>
+    <form class="edin" id="edForm" hidden autocomplete="off">
+      <button type="button" class="btn back" id="voltar">← Voltar à lista</button>
+      <div class="ehead">
+        <div><div class="k" id="eK">Produto</div><h2 id="eTitle">—</h2></div>
+        <div class="meta" id="eMeta"></div>
+      </div>
+
+      <div class="prev">
+        <div class="pcard">
+          <div class="stage" id="pStage"><img id="pImg" alt=""><div class="nof" id="pNof">Sem foto</div><div class="drop"></div></div>
+          <div class="pbody"><div class="cd" id="pCode"></div><div class="nm" id="pName"></div>
+            <div class="pcx" id="pCx"><div class="lb" id="pCxLb"></div><div class="v" id="pCxV"></div></div></div>
+        </div>
+        <div style="display:grid;gap:8px;align-content:start">
+          <input type="file" id="foto" accept="image/png,image/jpeg,image/webp" hidden>
+          <button type="button" class="btn" id="fotoBtn">Trocar foto</button>
+          <div class="photo-info" id="fotoInfo">PNG com fundo transparente ou branco, produto inteiro. Também dá para arrastar a foto para a vitrine.</div>
+        </div>
+      </div>
+
+      <div class="form">
+        <fieldset>
+          <legend>Identificação</legend>
+          <div class="g2">
+            <label class="f"><span>Código</span><input id="code" inputmode="numeric" required></label>
+            <label class="f"><span>Seção</span><select id="sec"><option value="ARTD">ARTD</option><option value="DESTILADOS">Destilados</option><option value="CANDIES">Candies</option></select></label>
+          </div>
+          <label class="f"><span>Nome</span><input id="name" required></label>
+          <div class="g3">
+            <label class="f"><span>Parceiro</span><input id="parc" list="dlParc"></label>
+            <label class="f"><span>Categoria</span><input id="sub" list="dlSub"></label>
+            <label class="f"><span>Marca</span><input id="brand" list="dlBrand"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Quantidade para 1 litro</legend>
+          <div class="g3">
+            <label class="f"><span id="cxLb">Caixas p/ 1 litro</span><input id="cx" inputmode="decimal" required></label>
+            <label class="f"><span id="ltLb">ml da caixa</span><input id="lt" inputmode="numeric" required></label>
+            <label class="f" id="unidBox"><span>Mostrar como</span><select id="unid"><option value="">Unidades (UN)</option><option value="cx">Caixas (CX)</option></select></label>
+          </div>
+          <div class="calc" id="calc"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Logística</legend>
+          <div class="g3">
+            <label class="f"><span>Caixaria</span><input id="cxr" inputmode="numeric"></label>
+            <label class="f" id="dispBox"><span>Display</span><input id="disp" inputmode="numeric"></label>
+            <label class="f"><span>Paletização</span><input id="pal" inputmode="numeric"></label>
+            <label class="f" id="upalBox"><span>Und. palete</span><input id="upal" inputmode="numeric"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Ordem e visibilidade</legend>
+          <div class="g2">
+            <label class="f" id="embBox"><span>Embalagem (ARTD)</span><select id="emb"><option value="">—</option><option value="garrafa">Garrafa (vem primeiro)</option><option value="lata">Lata</option></select></label>
+            <label class="f"><span>Posição manual</span><input id="ord" inputmode="decimal" placeholder="em branco = pelo código"><small>Ex.: 3450.5 fica entre o 3450 e o 3452.</small></label>
+          </div>
+          <label class="tog"><input type="checkbox" id="ativo"><span>Aparece no portfólio comercial</span></label>
+        </fieldset>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn primary" id="salvar">Salvar<span class="hide-m" style="margin-left:-4px">alterações</span></button>
+        <button type="button" class="btn" id="descartar">Descartar</button>
+        <span class="sp"></span>
+        <button type="button" class="btn danger" id="excluir">Excluir</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<datalist id="dlParc"></datalist><datalist id="dlSub"></datalist><datalist id="dlBrand"></datalist>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ===== BANCO DE DADOS (Supabase) — mesmo projeto do estoque ===== */
+const CONFIG = { url: "https://qenkaiybtjrpmzsmxukg.supabase.co", key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFlbmthaXlidGpycG16c214dWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NDQ0NTQsImV4cCI6MjExMDAyMDQ1NH0.JlaSDItSanR-1fSuwUT2tB-BnZ6fEx3C1VyLebdZhwI" };
+/* ================================================================= */
+
+const $ = s => document.querySelector(s);
+const SECS = {ARTD:{label:"ARTD", col:"var(--artd)"}, DESTILADOS:{label:"Destilados", col:"var(--dest)"}, CANDIES:{label:"Candies", col:"var(--cand)"}};
+const SPEC_KEYS = {ARTD:["cxr","pal"], DESTILADOS:["cxr","pal","upal"], CANDIES:["cxr","disp","pal"]};
+const LAYOUT = {STAGE_H:1.02, CHAO:.085, HMAX:.735, WMAX:.80, META:{ARTD:.15, DESTILADOS:.15, CANDIES:.30}};
+const BUCKET = "portfolio";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const numBR = s => { const v = String(s ?? "").trim().replace(/\./g, m => m).replace(",", "."); return v === "" ? null : Number(v); };
+
+/* mesma regra de enquadramento do portfólio (layout_produtos.py) */
+function caixa(m, sec){
+  const a = m.a, f = m.f, T = LAYOUT.META[sec] || .15;
+  const w = Math.min(Math.sqrt(T*a/f), LAYOUT.HMAX*LAYOUT.STAGE_H*a, LAYOUT.WMAX);
+  const hp = (w/a)/LAYOUT.STAGE_H, left = (1-w)/2;
+  let sw, sx; if (a < .6){ sw = m.fw*w*1.18; sx = left + m.fx*w; } else { sw = w*.86; sx = left + w/2; }
+  const r = v => Math.round(v*1e5)/1e3;
+  return {l:r(left), b:LAYOUT.CHAO*100, w:r(w), h:r(hp), sl:r(sx-sw/2), sw:r(sw)};
+}
+function litros(n){
+  if (!n) return "—";
+  const [i, dec] = (n/1000).toFixed(3).replace(/0+$/,"").replace(/\.$/,"").split(".");
+  return `${i}${dec ? `<em>,${dec}</em>` : ""}<small>${n===1000 ? "Lt" : "Lts"}</small>`;
+}
+let toastT;
+function toast(t, bad){ const el = $("#toast"); el.textContent = t; el.classList.toggle("bad", !!bad); el.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove("show"), bad ? 6000 : 3200); }
+function show(id){ ["vSetup","vLogin","vDenied","vApp"].forEach(v => $("#"+v).hidden = v !== id); }
+
+/* ---------- conexão ---------- */
+function cfg(){
+  if (CONFIG.url && CONFIG.key) return CONFIG;
+  try{ const c = JSON.parse(localStorage.getItem("portfolio_cfg") || "null"); if (c && c.url && c.key) return c; }catch(e){}
+  return null;
+}
+let sb = null, user = null, rows = [], cur = null, draft = null, pendingImg = null;
+const state = {sec:"TODOS", q:""};
+
+async function boot(){
+  const c = cfg();
+  if (!c){ show("vSetup"); return; }
+  if (!window.supabase){ show("vSetup"); toast("Não carregou a biblioteca do Supabase. Confira a internet e recarregue.", true); return; }
+  sb = window.supabase.createClient(c.url.replace(/\/$/,""), c.key, {auth:{persistSession:true, storageKey:"portfolio-admin-auth"}});
+  const {data:{session}} = await sb.auth.getSession();
+  if (session) await entrou(session.user); else show("vLogin");
+}
+$("#fSetup").addEventListener("submit", e => {
+  e.preventDefault();
+  const url = $("#sUrl").value.trim(), key = $("#sKey").value.trim();
+  if (!/^https:\/\/.+/.test(url) || key.length < 20){ toast("Confira a URL (começa com https://) e a chave.", true); return; }
+  try{ localStorage.setItem("portfolio_cfg", JSON.stringify({url, key})); }catch(e){}
+  CONFIG.url = url; CONFIG.key = key; boot();
+});
+$("#fLogin").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("#lErr").hidden = true; $("#lBtn").disabled = true; $("#lBtn").textContent = "Entrando…";
+  let email = $("#lEmail").value.trim();
+  if (!email.includes("@")){
+    const r = await sb.rpc("portfolio_email_login", {p_usuario: email});
+    email = r.data || "";
+  }
+  const {data, error} = email ? await sb.auth.signInWithPassword({email, password:$("#lPass").value}) : {error:{message:"invalid"}};
+  $("#lBtn").disabled = false; $("#lBtn").textContent = "Entrar";
+  if (error){ $("#lErr").textContent = /invalid/i.test(error.message) ? "Usuário ou senha incorretos." : "Não foi possível entrar: " + error.message; $("#lErr").hidden = false; return; }
+  await entrou(data.user);
+});
+$("#sair").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function entrou(u){
+  user = u;
+  $("#who").textContent = u.email; $("#sair").hidden = false;
+  const {data, error} = await sb.from("portfolio_admins").select("user_id").eq("user_id", u.id).maybeSingle();
+  if (error && /relation|does not exist|schema cache/i.test(error.message)){
+    show("vDenied"); $("#dWho").textContent = "As tabelas do portfólio ainda não existem. Rode o arquivo portfolio_supabase.sql no SQL Editor."; return;
+  }
+  if (!data){ show("vDenied"); $("#dWho").textContent = "Usuário: " + u.email; return; }
+  show("vApp");
+  await carregar();
+}
+
+/* ---------- lista ---------- */
+async function carregar(manterCodigo){
+  const {data, error} = await sb.from("portfolio_produtos").select("*").order("code");
+  if (error){ toast("Erro ao ler o banco: " + error.message, true); return; }
+  rows = data || [];
+  $("#seed").hidden = rows.length > 0;
+  datalists(); lista();
+  if (manterCodigo != null){ const r = rows.find(x => x.code === manterCodigo); if (r) abrir(r); }
+}
+function datalists(){
+  const set = k => [...new Set(rows.map(r => r[k]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt"));
+  $("#dlParc").innerHTML = set("parc").map(v => `<option value="${esc(v)}">`).join("");
+  $("#dlSub").innerHTML = set("sub").map(v => `<option value="${esc(v)}">`).join("");
+  $("#dlBrand").innerHTML = set("brand").map(v => `<option value="${esc(v)}">`).join("");
+}
+const ordOf = r => (r.ord ?? r.code);
+function lista(){
+  const qs = norm(state.q).split(/\s+/).filter(Boolean);
+  const hay = r => norm([r.code, r.name, r.parc, r.sub, r.brand, SECS[r.sec]?.label].join(" "));
+  const base = rows.filter(r => qs.every(t => hay(r).includes(t)));
+  const ocultos = base.filter(r => !r.ativo).length;
+  const opts = [["TODOS","Todos",null], ...Object.entries(SECS).map(([k,v]) => [k, v.label, v.col]), ["OCULTOS","Ocultos","var(--warn)"]];
+  $("#chips").innerHTML = opts.map(([k,l,c]) => {
+    const n = k==="TODOS" ? base.length : k==="OCULTOS" ? ocultos : base.filter(r=>r.sec===k).length;
+    if (k==="OCULTOS" && !n && state.sec!=="OCULTOS") return "";
+    return `<button class="chip ${state.sec===k?"on":""}" data-sec="${k}">${c?`<i style="background:${c}"></i>`:""}${l}<em class="num">${n}</em></button>`;
+  }).join("");
+  const vis = base.filter(r => state.sec==="TODOS" ? true : state.sec==="OCULTOS" ? !r.ativo : r.sec===state.sec);
+  const html = Object.keys(SECS).map(sec => {
+    const it = vis.filter(r => r.sec===sec).sort((a,b) => ordOf(a)-ordOf(b));
+    if (!it.length) return "";
+    return `<div class="gh"><i style="background:${SECS[sec].col}"></i>${SECS[sec].label} · ${it.length}</div>` + it.map(r => `
+      <button class="row ${cur && cur.code===r.code ? "sel":""}" data-code="${r.code}">
+        <span class="th">${r.img_url ? `<img loading="lazy" src="${esc(r.img_url)}${r.img_at?`?v=${Date.parse(r.img_at)}`:""}" alt="">` : ""}</span>
+        <span class="t"><b>${esc(r.name)}</b><span>${esc([r.parc, r.sub].filter(Boolean).join(" · "))}${!r.ativo?'<i class="pill off">oculto</i>':""}${!r.img_url?'<i class="pill nofoto">sem foto</i>':""}</span></span>
+        <span class="c num">${r.code}</span>
+      </button>`).join("");
+  }).join("");
+  $("#rows").innerHTML = html || `<div class="empty" style="height:auto;padding:40px 10px"><div>Nenhum produto ${state.q ? "encontrado" : "no banco ainda"}.</div></div>`;
+}
+$("#chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (!b) return; state.sec = b.dataset.sec; lista(); });
+$("#q").addEventListener("input", e => { state.q = e.target.value; lista(); });
+$("#rows").addEventListener("click", e => { const b = e.target.closest(".row"); if (!b) return; const r = rows.find(x => x.code === +b.dataset.code); if (r) pedirTroca(() => abrir(r)); });
+$("#recarregar").onclick = () => pedirTroca(() => carregar(cur && rows.some(r=>r.code===cur.code) ? cur.code : null));
+$("#novo").onclick = () => pedirTroca(() => abrir(null));
+
+/* ---------- editor ---------- */
+const CAMPOS = ["code","name","sec","parc","sub","brand","cx","lt","unid","cxr","disp","pal","upal","emb","ord"];
+function abrir(r){
+  cur = r ? {...r} : {code:"", name:"", sec: state.sec in SECS ? state.sec : "DESTILADOS", parc:"", sub:"", brand:"", cx:1, lt:"", unid:"", cxr:"", disp:"", pal:"", upal:"", emb:"", ord:null, ativo:true, med:null, img_url:null, img_at:null, _novo:true};
+  pendingImg = null; $("#foto").value = "";
+  CAMPOS.forEach(k => { const el = $("#"+k); const v = cur[k]; el.value = v === null || v === undefined ? "" : (k==="cx"||k==="ord") && v !== "" ? String(v).replace(".", ",") : v; });
+  $("#ativo").checked = cur.ativo !== false;
+  $("#code").readOnly = !cur._novo;
+  $("#eK").textContent = cur._novo ? "Novo produto" : `Código ${cur.code}`;
+  $("#eTitle").textContent = cur._novo ? "Cadastrar produto" : cur.name;
+  $("#eMeta").textContent = cur.updated_at ? "Última alteração: " + new Date(cur.updated_at).toLocaleString("pt-BR") : "";
+  $("#excluir").hidden = !!cur._novo; desarmar();
+  $("#fotoInfo").innerHTML = "PNG com fundo transparente ou branco, produto inteiro. Também dá para arrastar a foto para a vitrine.";
+  $("#edEmpty").hidden = true; $("#edForm").hidden = false; $("#ed").classList.add("open"); $("#ed").scrollTop = 0;
+  atualizar(); lista();
+  if (cur._novo) $("#code").focus({preventScroll:true});
+}
+function lerForm(){
+  const v = k => $("#"+k).value.trim();
+  const sec = v("sec");
+  const d = {code: parseInt(v("code"),10), name: v("name").toUpperCase(), sec, parc: v("parc").toUpperCase(), sub: v("sub"), brand: v("brand").toUpperCase(),
+    cx: numBR(v("cx")), lt: parseInt(v("lt").replace(/\D/g,""),10) || null, unid: sec==="DESTILADOS" ? v("unid") : "",
+    cxr: v("cxr"), disp: sec==="CANDIES" ? v("disp") : "", pal: v("pal"), upal: sec==="DESTILADOS" ? v("upal") : "",
+    emb: sec==="ARTD" ? v("emb") : "", ord: numBR(v("ord")), ativo: $("#ativo").checked};
+  d.lit = sec==="CANDIES" && d.lt ? `${d.lt} ml` : "";
+  return d;
+}
+function atualizar(){
+  const d = lerForm(), sec = d.sec;
+  $("#dispBox").hidden = sec !== "CANDIES"; $("#upalBox").hidden = sec !== "DESTILADOS";
+  $("#embBox").hidden = sec !== "ARTD"; $("#unidBox").hidden = sec !== "DESTILADOS";
+  const emCx = sec !== "DESTILADOS" || d.unid === "cx";
+  $("#cxLb").textContent = emCx ? "Caixas p/ 1 litro" : "Unidades p/ 1 litro";
+  $("#ltLb").textContent = emCx ? "ml da caixa" : "ml da unidade";
+  const tot = d.cx && d.lt ? Math.round(d.cx * d.lt) : 0;
+  const s = emCx ? "CX" : "UN", cxs = d.cx ? d.cx.toLocaleString("pt-BR") : "—";
+  $("#calc").innerHTML = tot ? `${cxs} ${s.toLowerCase()} × ${d.lt.toLocaleString("pt-BR")} ml = <b>${(tot/1000).toLocaleString("pt-BR",{maximumFractionDigits:3})} L</b>${tot < 1000 ? ' <span style="color:var(--warn)">· não chega a 1 litro</span>' : ""}` : "Preencha a quantidade e o ml para ver a conta.";
+  /* vitrine */
+  const med = pendingImg ? pendingImg.med : cur.med;
+  const src = pendingImg ? pendingImg.url : cur.img_url ? cur.img_url + (cur.img_at ? "?v=" + Date.parse(cur.img_at) : "") : "";
+  const img = $("#pImg"), st = $("#pStage");
+  if (src && med && med.f){
+    const bx = caixa(med, sec);
+    Object.assign(img.style, {left:bx.l+"%", bottom:bx.b+"%", width:bx.w+"%", height:bx.h+"%"});
+    st.style.setProperty("--sl", bx.sl+"%"); st.style.setProperty("--sw", bx.sw+"%"); st.style.setProperty("--fl", bx.b+"%");
+    if (img.getAttribute("src") !== src) img.src = src; img.hidden = false; $("#pNof").hidden = true;
+  } else { img.hidden = true; img.removeAttribute("src"); $("#pNof").hidden = false; }
+  $("#pCode").textContent = d.code ? "CÓD. " + d.code : "CÓD. —";
+  $("#pName").textContent = d.name || "Nome do produto";
+  $("#pCx").dataset.sec = sec;
+  $("#pCxLb").textContent = (emCx ? "CAIXAS" : "UNIDADES") + " PARA 1 LITRO";
+  $("#pCxV").innerHTML = `<span class="q">${cxs}<small>${s}</small></span><span class="is">=</span><span class="l">${litros(tot)}</span>`;
+  /* destaque do que mudou */
+  const sujo = alterado();
+  CAMPOS.concat(["ativo"]).forEach(k => {
+    const el = $("#"+k).closest(".f"); if (!el) return;
+    el.classList.toggle("changed", !cur._novo && campoMudou(k, d));
+  });
+  $("#salvar").disabled = !sujo;
+  $("#descartar").disabled = !sujo;
+}
+function campoMudou(k, d){
+  const a = cur[k], b = d[k];
+  if (k==="cx"||k==="ord"||k==="lt") return (a===null||a===undefined||a==="" ? null : Number(a)) !== (b===null||b===undefined||Number.isNaN(b) ? null : Number(b));
+  return String(a ?? "") !== String(b ?? "");
+}
+function alterado(){
+  if (!cur) return false;
+  if (cur._novo) return true;
+  if (pendingImg) return true;
+  const d = lerForm();
+  return CAMPOS.some(k => campoMudou(k, d)) || (cur.ativo !== false) !== d.ativo;
+}
+function pedirTroca(fn){
+  if (alterado() && !cur._novo){
+    toast("Você tem alterações não salvas. Salve ou clique em Descartar antes.", true); return;
+  }
+  fn();
+}
+$("#edForm").addEventListener("input", atualizar);
+$("#edForm").addEventListener("change", atualizar);
+$("#descartar").onclick = () => { if (cur._novo){ fechar(); } else abrir(rows.find(r => r.code === cur.code)); };
+$("#voltar").onclick = () => pedirTroca(fechar);
+function fechar(){ cur = null; pendingImg = null; $("#edForm").hidden = true; $("#edEmpty").hidden = false; $("#ed").classList.remove("open"); lista(); }
+
+/* ---------- salvar ---------- */
+$("#edForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const d = lerForm();
+  if (!d.code || d.code < 1){ toast("Informe o código do produto.", true); $("#code").focus(); return; }
+  if (cur._novo && rows.some(r => r.code === d.code)){ toast(`O código ${d.code} já existe. Abra ele na lista para editar.`, true); return; }
+  if (!d.name){ toast("Informe o nome do produto.", true); $("#name").focus(); return; }
+  if (!d.cx || d.cx <= 0){ toast("Informe a quantidade para 1 litro.", true); $("#cx").focus(); return; }
+  if (!d.lt){ toast("Informe o ml da caixa/unidade.", true); $("#lt").focus(); return; }
+  if (!SPEC_KEYS[d.sec]) return;
+  const btn = $("#salvar"); btn.disabled = true; btn.innerHTML = "Salvando…";
+  try{
+    const row = {...d};
+    if (pendingImg){
+      const path = `produtos/${d.code}-${Date.now()}.jpg`;
+      const up = await sb.storage.from(BUCKET).upload(path, pendingImg.blob, {contentType:"image/jpeg", upsert:true, cacheControl:"31536000"});
+      if (up.error) throw new Error("foto: " + up.error.message);
+      row.img_url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+      row.img_at = new Date().toISOString();
+      row.med = pendingImg.med;
+      const antiga = cur.img_url && cur.img_url.split(`/object/public/${BUCKET}/`)[1];
+      if (antiga) sb.storage.from(BUCKET).remove([decodeURIComponent(antiga)]).catch(()=>{});
+    }
+    const q = cur._novo ? sb.from("portfolio_produtos").insert(row) : sb.from("portfolio_produtos").update(row).eq("code", cur.code);
+    const {error} = await q;
+    if (error) throw new Error(error.message);
+    pendingImg = null;
+    toast(d.ativo ? (row.img_url || cur.img_url ? "Salvo. O portfólio já mostra a mudança." : "Salvo. Falta a foto para ele aparecer no portfólio.") : "Salvo. Este produto está oculto no portfólio.");
+    await carregar(d.code);
+  }catch(err){
+    toast("Não salvou: " + (/row-level|permission|violates/i.test(err.message) ? "seu usuário não tem permissão de edição." : err.message), true);
+  }finally{ btn.innerHTML = 'Salvar<span class="hide-m" style="margin-left:-4px">alterações</span>'; atualizar(); }
+});
+
+/* ---------- excluir (confirmação no próprio botão) ---------- */
+let armT;
+function desarmar(){ clearTimeout(armT); const b = $("#excluir"); b.classList.remove("armed"); b.textContent = "Excluir"; }
+$("#excluir").onclick = async () => {
+  const b = $("#excluir");
+  if (!b.classList.contains("armed")){ b.classList.add("armed"); b.textContent = "Confirmar"; armT = setTimeout(desarmar, 5000); return; }
+  desarmar();
+  const {error} = await sb.from("portfolio_produtos").delete().eq("code", cur.code);
+  if (error){ toast("Não excluiu: " + error.message, true); return; }
+  const antiga = cur.img_url && cur.img_url.split(`/object/public/${BUCKET}/`)[1];
+  if (antiga) sb.storage.from(BUCKET).remove([decodeURIComponent(antiga)]).catch(()=>{});
+  toast(`Produto ${cur.code} excluído.`); cur = null; fechar(); await carregar();
+};
+
+/* ---------- foto: recorte do branco, medidas e redução (mesma regra do medir_imagens.py) ---------- */
+function carregarImg(src){ return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error("Não consegui abrir a imagem.")); i.crossOrigin = "anonymous"; i.src = src; }); }
+async function processar(fonte){
+  const img = await carregarImg(fonte);
+  const k = Math.min(1, 2400 / Math.max(img.naturalWidth, img.naturalHeight));
+  const W = Math.round(img.naturalWidth*k), H = Math.round(img.naturalHeight*k);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d", {willReadFrequently:true});
+  x.fillStyle = "#fff"; x.fillRect(0,0,W,H); x.drawImage(img, 0, 0, W, H);
+  const px = x.getImageData(0,0,W,H).data;
+  /* fundo: confere os cantos */
+  const canto = (cx,cy) => { const i=(cy*W+cx)*4; return Math.min(px[i],px[i+1],px[i+2]); };
+  const fundoBranco = [canto(1,1),canto(W-2,1),canto(1,H-2),canto(W-2,H-2)].every(v => v >= 235);
+  const m = new Uint8Array(W*H), rc = new Uint32Array(H), cc = new Uint32Array(W);
+  for (let y=0; y<H; y++) for (let xx=0; xx<W; xx++){
+    const i = (y*W+xx)*4, d = 255 - Math.min(px[i],px[i+1],px[i+2]);
+    if (d > 22){ m[y*W+xx] = 1; rc[y]++; cc[xx]++; }
+  }
+  const lim = 2;
+  let y0=0; while (y0<H && rc[y0]<lim) y0++;
+  let y1=H-1; while (y1>y0 && rc[y1]<lim) y1--;
+  let x0=0; while (x0<W && cc[x0]<lim) x0++;
+  let x1=W-1; while (x1>x0 && cc[x1]<lim) x1--;
+  if (y1-y0 < 20 || x1-x0 < 20) throw new Error("Não achei o produto na foto (fundo e produto muito parecidos).");
+  const pad = 2; x0=Math.max(0,x0-pad); y0=Math.max(0,y0-pad); x1=Math.min(W-1,x1+pad); y1=Math.min(H-1,y1+pad);
+  const w = x1-x0+1, h = y1-y0+1;
+  let area = 0; const spans = [];
+  for (let y=y0; y<=y1; y++){
+    let a=-1, b=-1;
+    for (let xx=x0; xx<=x1; xx++) if (m[y*W+xx]){ if (a<0) a=xx; b=xx; }
+    if (a>=0){ area += b-a+1; spans.push([y-y0, a-x0, b-x0]); }
+  }
+  let base = spans.filter(s => s[0] >= h*0.97); if (!base.length) base = spans.slice(-3);
+  const bl = Math.min(...base.map(s=>s[1])), br = Math.max(...base.map(s=>s[2]));
+  const med = {a:+(w/h).toFixed(4), f:+(area/(w*h)).toFixed(4), fw:+((br-bl+1)/w).toFixed(4), fx:+(((bl+br)/2)/w).toFixed(4)};
+  /* recorte final, no máximo 900 px no lado maior */
+  const s2 = Math.min(1, 900/Math.max(w,h));
+  const o = document.createElement("canvas"); o.width = Math.round(w*s2); o.height = Math.round(h*s2);
+  const ox = o.getContext("2d"); ox.fillStyle = "#fff"; ox.fillRect(0,0,o.width,o.height);
+  ox.imageSmoothingQuality = "high"; ox.drawImage(c, x0, y0, w, h, 0, 0, o.width, o.height);
+  const blob = await new Promise(r => o.toBlob(r, "image/jpeg", .88));
+  const lado = med.a < .6 ? h/k : w/k;   /* tamanho real do produto na foto enviada */
+  return {blob, url: URL.createObjectURL(blob), med, fundoBranco, lado: Math.round(lado), garrafa: med.a < .6};
+}
+async function receberFoto(file){
+  if (!file) return;
+  if (!/^image\//.test(file.type)){ toast("Escolha uma imagem (PNG, JPG ou WEBP).", true); return; }
+  $("#fotoInfo").textContent = "Preparando a foto…";
+  try{
+    const src = URL.createObjectURL(file);
+    pendingImg = await processar(src);
+    const p = pendingImg, minimo = p.garrafa ? 900 : 700;
+    const avisos = [];
+    if (!p.fundoBranco) avisos.push('<span class="w">O fundo não é branco nem transparente: ele vai aparecer no card.</span>');
+    if (p.lado < minimo) avisos.push(`<span class="w">Foto pequena (${p.lado} px de ${p.garrafa ? "altura" : "largura"}): pode ficar pouco nítida na ficha ampliada.</span>`);
+    $("#fotoInfo").innerHTML = (avisos.length ? avisos.join("<br>") : '<span class="g">Foto boa: recortada e enquadrada no padrão.</span>') + "<br>Clique em Salvar alterações para publicar.";
+    atualizar();
+  }catch(err){ pendingImg = null; $("#fotoInfo").innerHTML = `<span class="w">${esc(err.message)}</span>`; }
+}
+$("#fotoBtn").onclick = () => $("#foto").click();
+$("#foto").addEventListener("change", e => receberFoto(e.target.files[0]));
+const stg = $("#pStage");
+["dragenter","dragover"].forEach(t => stg.addEventListener(t, e => { e.preventDefault(); stg.classList.add("over"); }));
+["dragleave","drop"].forEach(t => stg.addEventListener(t, e => { e.preventDefault(); stg.classList.remove("over"); }));
+stg.addEventListener("drop", e => receberFoto(e.dataTransfer.files[0]));
+
+/* ---------- importação inicial: lê o index.html publicado (produtos + fotos) ---------- */
+function extrair(html){
+  const pega = (ini, fim) => { const a = html.indexOf(ini); if (a < 0) return null; const b = html.indexOf(fim, a + ini.length); return b < 0 ? null : html.slice(a + ini.length, b); };
+  const D = pega("const DATA = ", ";\nconst IMG = "), I = pega("const IMG = ", ";\nconst IMGM = "), M = pega("const IMGM = ", ";  /*");
+  if (!D || !I || !M) throw new Error("Este arquivo não parece ser o index.html do portfólio.");
+  return {DATA: JSON.parse(D), IMG: JSON.parse(I), IMGM: JSON.parse(M)};
+}
+async function importar(html){
+  const btn = $("#seedBtn"), msg = $("#seedMsg"), bar = $("#seedBar");
+  btn.disabled = true; msg.hidden = false; msg.className = "msg";
+  try{
+    const {DATA, IMG, IMGM} = extrair(html);
+    const linhas = []; let feitos = 0;
+    const fila = DATA.slice();
+    async function um(d){
+      const m = IMGM[String(d.code)] || {a:.5, fw:.8, fx:.5};
+      const med = {a:m.a, fw:m.fw, fx:m.fx, f:+((LAYOUT.META[d.sec]||.15) * m.a / Math.pow(d.bx.w/100, 2)).toFixed(4)};
+      let img_url = null;
+      const dataUrl = IMG[String(d.code)];
+      if (dataUrl){
+        const blob = await (await fetch(dataUrl)).blob();
+        const path = `produtos/${d.code}-base.jpg`;
+        const up = await sb.storage.from(BUCKET).upload(path, blob, {contentType: blob.type || "image/jpeg", upsert:true, cacheControl:"31536000"});
+        if (up.error) throw new Error(`foto ${d.code}: ${up.error.message}`);
+        img_url = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+      }
+      linhas.push({code:d.code, name:d.name, sec:d.sec, parc:d.parc||"", sub:d.sub||"", brand:d.brand||"", cx:d.cx, unid:d.unid||"", lt:d.lt||null,
+        lit:d.lit||"", cxr:d.cxr||"", disp:d.disp||"", pal:d.pal||"", upal:d.upal||"", emb:d.emb||"", ord:d.ord ?? null,
+        med, img_url, img_at:null, ativo:true});
+      feitos++; bar.style.width = (feitos/DATA.length*90).toFixed(1) + "%"; msg.textContent = `Enviando fotos: ${feitos} de ${DATA.length}`;
+    }
+    await Promise.all(Array.from({length:4}, async () => { while (fila.length) await um(fila.shift()); }));
+    msg.textContent = "Gravando os produtos…";
+    const {error} = await sb.from("portfolio_produtos").upsert(linhas, {onConflict:"code"});
+    if (error) throw new Error(error.message);
+    bar.style.width = "100%"; msg.className = "msg ok"; msg.textContent = `${linhas.length} produtos importados.`;
+    toast(`${linhas.length} produtos importados.`);
+    await carregar();
+  }catch(err){
+    msg.className = "msg bad"; msg.textContent = "Não terminou: " + (/row-level|permission|violates/i.test(err.message) ? "seu usuário não tem permissão de edição." : err.message) + " Clique de novo para continuar.";
+  }finally{ btn.disabled = false; }
+}
+$("#seedBtn").onclick = async () => {
+  let html = null;
+  try{
+    const r = await fetch("./index.html", {cache:"no-store"});
+    if (r.ok){ const t = await r.text(); if (t.includes("const IMGM = ")) html = t; }
+  }catch(e){}
+  if (html){ await importar(html); return; }
+  $("#seedMsg").hidden = false; $("#seedMsg").className = "msg"; $("#seedMsg").textContent = "Não achei o index.html neste site. Selecione o arquivo index.html do portfólio no seu computador.";
+  $("#seedFile").click();
+};
+$("#seedFile").addEventListener("change", async e => { const f = e.target.files[0]; if (f) await importar(await f.text()); });
+
+window.addEventListener("beforeunload", e => { if (alterado() && cur && !cur._novo){ e.preventDefault(); e.returnValue = ""; } });
+boot();
+</script>
+</body>
+</html>
